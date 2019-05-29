@@ -8,6 +8,7 @@
 std::string input_file_name, exclusion_file_name, output_file_name;
 std::vector<std::string> exclusions;
 bool print_links = false;
+int browser = -1;
 
 int main(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
@@ -35,7 +36,6 @@ int main(int argc, char **argv) {
 				return PROG_ERROR_PARAM;
 			}
 			exclusion_file_name = argv[i + 1];
-			output_file_name = argv[i + 1];
 			i++;
 		} else if (strcmp("-v", argv[i]) == 0 || strcmp("--verbose", argv[i]) == 0) {
 			print_links = true;
@@ -46,6 +46,23 @@ int main(int argc, char **argv) {
 			}
 			output_file_name = argv[i + 1];
 			i++;
+		} else if (strcmp("-b", argv[i]) == 0 || strcmp("--browser", argv[i]) == 0) {
+			if (i + 1 >= argc) {
+				std::cout << "Not enough parameters provided for command \'" << argv[i] << "\'!" << std::endl;
+				return PROG_ERROR_PARAM;
+			}
+			for (unsigned int j = 0; j < strlen(argv[i + 1]); j++)
+				if (argv[i + 1][j] < 97)
+					argv[i + 1][j] += 32;
+			if (strcmp(argv[i + 1], "firefox") == 0) {
+				browser = 0;
+			} else if (strcmp(argv[i + 1], "chrome") == 0) {
+				browser = 1;
+			} else {
+				std::cout << "Browser \'" << argv[i + 1] << "\' not supported!" << std::endl;
+				return PROG_ERROR_NO_BROWSER;
+			}
+			i++;
 		} else {
 			std::cout << "Unrecognized command \'" << argv[i] << "\'!" << std::endl;
 			return PROG_ERROR_PARAM;
@@ -55,6 +72,11 @@ int main(int argc, char **argv) {
 	if (input_file_name.size() == 0) {
 		std::cout << "No input file specified!" << std::endl;
 		return PROG_ERROR_NO_INPUT;
+	}
+
+	if (browser == -1) {
+		std::cout << "No browser specified!" << std::endl;
+		return PROG_ERROR_NO_BROWSER;
 	}
 
 	if (exclusion_file_name.size() > 0) {
@@ -132,8 +154,13 @@ int main(int argc, char **argv) {
 			}
 		}
 	}
-
-	system(form.fetch().c_str());
+	std::string output;
+	if (browser == 0)
+		output += "firefox ";
+	else if (browser == 1)
+		output += "google-chrome ";
+	output += form.fetch();
+	system(output.c_str());
 
 	return PROG_ERROR_NONE;
 }

@@ -36,7 +36,6 @@ void formatter::format() {
 		stmp.clear();
 	}
 
-	output += "firefox ";
 	std::size_t index;
 	for (unsigned int i = 0; i < input_lines.size(); i++) {
 		if (exclusions.size() > 0)
