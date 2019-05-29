@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
 				std::cout << "Not enough parameters provided for command \'" << argv[i] << "\'!" << std::endl;
 				return PROG_ERROR_PARAM;
 			}
+			output_file_name = argv[i + 1];
 			i++;
 		} else {
 			std::cout << "Unrecognized command \'" << argv[i] << "\'!" << std::endl;
@@ -57,75 +58,82 @@ int main(int argc, char **argv) {
 	}
 
 	if (exclusion_file_name.size() > 0) {
-		std::ifstream exclusion_file(exclusion_file_name, std::ios::in);
-		if (exclusion_file.is_open()) {
+		std::ifstream exclusions_file(exclusion_file_name, std::ios::in);
+		if (exclusions_file.is_open()) {
 			std::string tmp;
-			while (std::getline(exclusion_file, tmp, '\n'))
+			while (std::getline(exclusions_file, tmp)) {
+				if (exclusions_file.fail()) {
+					std::cout << "Error opening file \'" << input_file_name << "\'!" << std::endl;
+					return PROG_ERROR_FILE_IO;
+				}
 				exclusions.push_back(tmp);
-			exclusion_file.close();
-			if (!exclusion_file.eof()) {
-				std::cout << "Error reading file: \'" << exclusion_file_name << "\'!" << std::endl;
-				return PROG_ERROR_FILE_IO;
 			}
+			exclusions_file.close();
 		} else {
-			std::cout << "Error opening file: \'" << exclusion_file_name << "\'!" << std::endl;
+			std::cout << "Error opening file \'" << exclusion_file_name << "\'!" << std::endl;
 			return PROG_ERROR_FILE_IO;
 		}
 	} else {
-		std::cout << "Executing with no exclusion file specified..." << std::endl;
+		std::cout << "No exclusion file specified. Running without exclusions..." << std::endl;
 	}
 
-	std::stringstream buffer;
+	std::string buffer;
 	std::ifstream input_file(input_file_name, std::ios::in);
 	if (input_file.is_open()) {
-		buffer << input_file.rdbuf();
-		if (input_file.fail()) {
-			std::cout << "Error reading file: \'" << input_file_name << "\'!" << std::endl;
-			return PROG_ERROR_FILE_IO;
+		std::string tmp;
+		while (std::getline(input_file, tmp, '\n')) {
+			if (input_file.fail()) {
+				std::cout << "Error reading file \'" << input_file_name << "\'!" << std::endl;
+				return PROG_ERROR_FILE_IO;
+			}
+			buffer += tmp;
+			buffer += '\n';
 		}
+		input_file.close();
 	} else {
-		std::cout << "Error opening file: \'" << input_file_name << "\'!" << std::endl;
+		std::cout << "Error opening file \'" << input_file_name << "\'!" << std::endl;
 		return PROG_ERROR_FILE_IO;
 	}
 
-	formatter form(buffer.str(), exclusions);
+	if (buffer.size() == 0) {
+		std::cout << "Empty input file. Exiting..." << std::endl;
+		return PROG_ERROR_INPUT_EMPTY;
+	}
+
+	formatter form(buffer, exclusions);
 	form.format();
 
 	if (print_links || output_file_name.size() > 0) {
+		std::string output;
 		std::vector<std::string> lines = form.fetch_lines();
 		if (print_links)
 			std::cout << "LINKS:" << std::endl;
-		std::size_t index;
-		std::ofstream output_file;
+		for (unsigned int i = 0; i < lines.size(); i++) {
+			std::size_t index;
+			while ((index = lines.at(i).find('+', 0)) != std::string::npos)
+				lines.at(i)[index] = ' ';
+			output += lines.at(i);
+			output += '\n';
+			if (print_links)
+				std::cout << "  " << lines.at(i) << std::endl;
+		}
 		if (output_file_name.size() > 0) {
-			output_file.open(output_file_name, std::ios::out);
-			if (!output_file.is_open()) {
-				std::cout << "Error opening file: \'" << output_file_name << "\'!" << std::endl;
+			std::ofstream output_file(output_file_name, std::ios::out);
+			if (output_file.is_open()) {
+				output_file << output;
+				if (output_file.fail()) {
+					std::cout << "Error writing to file \'" << output_file_name << "\'!" << std::endl;
+					return PROG_ERROR_FILE_IO;
+				}
+				output_file.close();
+			} else {
+				std::cout << "Error opening/creating file \'" << output_file_name << "\'!" << std::endl;
 				return PROG_ERROR_FILE_IO;
 			}
 		}
-		for (unsigned int i = 0; i < lines.size(); i++) {
-			while ((index = lines.at(i).find('+')) != std::string::npos)
-				lines.at(i)[index] = ' ';
-			if (print_links) {
-				std::cout << "  " << lines.at(i) << std::endl;
-			} else {
-				if (output_file.is_open()) {
-					output_file << lines.at(i) << std::endl;
-				}
-				if (!output_file.good()) {
-					output_file.close();
-					std::cout << "Error writing to file: \'" << output_file_name << "\'!" << std::endl;
-					return PROG_ERROR_FILE_IO;
-				}
-			}
-		}
-		if (output_file.is_open()) {
-			output_file.close();
-		}
 	}
 
-	//system(form.fetch().c_str());
+	system(form.fetch().c_str());
 
 	return PROG_ERROR_NONE;
 }
